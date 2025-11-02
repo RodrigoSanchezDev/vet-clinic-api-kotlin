@@ -1,6 +1,7 @@
 package service
 
 import model.Consulta
+import model.ConsultaCompleta
 import model.Dueno
 import model.Mascota
 import model.Veterinario
@@ -16,6 +17,9 @@ import util.formatearMoneda
  */
 
 class ConsultaService {
+
+    // Arreglo para almacenar todas las consultas registradas
+    private val consultasRegistradas = mutableListOf<ConsultaCompleta>()
 
     private val tiposServicio = mapOf(
         1 to Pair("Consulta General", 25000.0),
@@ -73,17 +77,65 @@ class ConsultaService {
         return tiposServicio[opcion]?.first ?: "Consulta General"
     }
 
+    /**
+     * Crea consulta con manejo robusto de excepciones
+     * Try-catch para entradas inválidas
+     */
+    fun crearConsultaSegura(
+        idConsulta: Int,
+        descripcion: String,
+        costoFinal: Double,
+        estado: String = "Pendiente",
+        tipoServicio: String = "Consulta General",
+        comentarios: String? = null
+    ): Consulta? {
+        return try {
+            // Validaciones con excepciones específicas
+            if (descripcion.isBlank()) {
+                throw IllegalArgumentException("La descripción no puede estar vacía")
+            }
+
+            if (costoFinal < 0) {
+                throw IllegalArgumentException("El costo no puede ser negativo")
+            }
+
+            Consulta(
+                idConsulta = idConsulta,
+                descripcion = descripcion,
+                costoConsulta = costoFinal,
+                estado = estado,
+                tipoServicio = tipoServicio,
+                comentariosAdicionales = comentarios  // Campo opcional
+            )
+        } catch (e: IllegalArgumentException) {
+            println("❌ ERROR al crear consulta: ${e.message}")
+            println("   Usando valores por defecto")
+            Consulta(
+                idConsulta = idConsulta,
+                descripcion = descripcion.ifBlank { "Sin descripción" },
+                costoConsulta = if (costoFinal < 0) 0.0 else costoFinal,
+                estado = estado,
+                tipoServicio = tipoServicio
+            )
+        } catch (e: Exception) {
+            println("❌ ERROR inesperado al crear consulta: ${e.message}")
+            null
+        }
+    }
+
     fun crearConsulta(
         idConsulta: Int,
         descripcion: String,
         costoFinal: Double,
-        estado: String = "Pendiente"
+        estado: String = "Pendiente",
+        tipoServicio: String = "Consulta General"
     ): Consulta {
         return Consulta(
             idConsulta = idConsulta,
             descripcion = descripcion,
             costoConsulta = costoFinal,
-            estado = estado
+            estado = estado,
+            tipoServicio = tipoServicio
         )
     }
 
@@ -125,9 +177,198 @@ class ConsultaService {
         println("╚═══════════════════════════════════════════════════════════════╝\n")
     }
 
+    /**
+     * Envía recordatorios usando let - solo si email es válido
+     * Manejo robusto de valores nulos
+     */
     fun enviarRecordatorios(dueno: Dueno) {
-        println("Se enviará un recordatorio a ${dueno.email} 24 horas antes de la cita.")
-        println("También recibirá un SMS al número ${dueno.telefono}\n")
+        println("\n📮 Configurando recordatorios...")
+
+        // Usar let para enviar email solo si es válido
+        dueno.email.takeIf { it.contains("@") && it.contains(".") }?.let { emailValido ->
+            println("✅ Se enviará recordatorio a $emailValido 24 horas antes de la cita")
+        } ?: println("⚠️  Email inválido. No se enviará recordatorio por correo")
+
+        // Usar let para enviar SMS solo si teléfono existe
+        dueno.telefono.takeIf { it.isNotBlank() }?.let { telefonoValido ->
+            println("✅ Se enviará SMS al número $telefonoValido")
+        } ?: println("⚠️  Teléfono no disponible. No se enviará SMS")
+
+        println()
     }
+
+    /**
+     * Registra una consulta completa en el arreglo
+     * Con manejo seguro de nulos
+     */
+    fun registrarConsultaCompleta(
+        consulta: Consulta,
+        dueno: Dueno,
+        mascota: Mascota,
+        veterinario: Veterinario,
+        fechaHora: String
+    ) {
+        try {
+            val consultaCompleta = ConsultaCompleta(consulta, dueno, mascota, veterinario, fechaHora)
+            consultasRegistradas.add(consultaCompleta)
+            println("✅ Consulta #${consulta.idConsulta} registrada en el sistema")
+        } catch (e: Exception) {
+            println("❌ ERROR al registrar consulta completa: ${e.message}")
+        }
+    }
+    fun registrarConsultaCompleta(
+        consulta: Consulta,
+        dueno: Dueno,
+        mascota: Mascota,
+        veterinario: Veterinario,
+        fechaHora: String
+    ) {
+        val consultaCompleta = ConsultaCompleta(consulta, dueno, mascota, veterinario, fechaHora)
+        consultasRegistradas.add(consultaCompleta)
+        println("✅ Consulta #${consulta.idConsulta} registrada en el sistema")
+    }
+
+    /**
+     * Genera informe de todas las consultas usando ciclo for
+     */
+    fun generarInformeConsultas() {
+        if (consultasRegistradas.isEmpty()) {
+            println("\n⚠️  No hay consultas registradas en el sistema.")
+            return
+        }
+
+        println("\n╔═══════════════════════════════════════════════════════════════╗")
+        println("║              INFORME DE CONSULTAS REGISTRADAS                 ║")
+        println("╚═══════════════════════════════════════════════════════════════╝")
+        println("Total de consultas: ${consultasRegistradas.size}\n")
+
+        // Ciclo for para recorrer todas las consultas
+        for (i in consultasRegistradas.indices) {
+            val cc = consultasRegistradas[i]
+            println("┌─────────────── CONSULTA #${i + 1} ───────────────────────────┐")
+            println("│ ID: #${cc.consulta.idConsulta} | Estado: ${cc.consulta.estado}")
+            println("├──────────────────────────────────────────────────────────────┤")
+            println("│ Dueño:       ${cc.dueno.nombreDueno}")
+            println("│ Email:       ${cc.dueno.email}")
+            println("│ Teléfono:    ${cc.dueno.telefono}")
+            println("├──────────────────────────────────────────────────────────────┤")
+            println("│ Mascota:     ${cc.mascota.nombre} (${cc.mascota.especie})")
+            println("│ Edad:        ${cc.mascota.edad} año(s) | Peso: ${cc.mascota.peso} kg")
+            println("├──────────────────────────────────────────────────────────────┤")
+            println("│ Motivo:      ${cc.consulta.descripcion}")
+            println("│ Veterinario: Dr(a). ${cc.veterinario.nombre}")
+            println("│ Especialidad: ${cc.veterinario.especialidad}")
+            println("│ Fecha/Hora:  ${cc.fechaHora}")
+            println("│ Costo:       ${formatearMoneda(cc.consulta.costoConsulta)}")
+            println("└──────────────────────────────────────────────────────────────┘\n")
+        }
+    }
+
+    /**
+     * Filtra consultas por estado (Pendiente/Programada/Realizada/Cancelada)
+     */
+    fun filtrarConsultasPorEstado(estado: String): List<ConsultaCompleta> {
+        val consultasFiltradas = mutableListOf<ConsultaCompleta>()
+
+        // Ciclo for para filtrar
+        for (consulta in consultasRegistradas) {
+            if (consulta.consulta.estado.equals(estado, ignoreCase = true)) {
+                consultasFiltradas.add(consulta)
+            }
+        }
+
+        return consultasFiltradas
+    }
+
+    /**
+     * Muestra consultas pendientes agrupadas
+     */
+    fun mostrarConsultasPendientes() {
+        val pendientes = filtrarConsultasPorEstado("Pendiente")
+
+        if (pendientes.isEmpty()) {
+            println("\n✅ No hay consultas pendientes.")
+            return
+        }
+
+        println("\n╔═══════════════════════════════════════════════════════════════╗")
+        println("║                  CONSULTAS PENDIENTES                         ║")
+        println("╚═══════════════════════════════════════════════════════════════╝")
+        println("Total pendientes: ${pendientes.size}\n")
+
+        for ((index, cc) in pendientes.withIndex()) {
+            println("${index + 1}. ID: #${cc.consulta.idConsulta} | ${cc.mascota.nombre} (${cc.dueno.nombreDueno})")
+            println("   Motivo: ${cc.consulta.descripcion}")
+            println("   Costo: ${formatearMoneda(cc.consulta.costoConsulta)}\n")
+        }
+    }
+
+    /**
+     * Muestra consultas programadas
+     */
+    fun mostrarConsultasProgramadas() {
+        val programadas = filtrarConsultasPorEstado("Programada")
+
+        if (programadas.isEmpty()) {
+            println("\n⚠️  No hay consultas programadas.")
+            return
+        }
+
+        println("\n╔═══════════════════════════════════════════════════════════════╗")
+        println("║                 CONSULTAS PROGRAMADAS                         ║")
+        println("╚═══════════════════════════════════════════════════════════════╝")
+        println("Total programadas: ${programadas.size}\n")
+
+        for ((index, cc) in programadas.withIndex()) {
+            println("${index + 1}. ID: #${cc.consulta.idConsulta} | ${cc.mascota.nombre}")
+            println("   Dueño: ${cc.dueno.nombreDueno} | Tel: ${cc.dueno.telefono}")
+            println("   Veterinario: Dr(a). ${cc.veterinario.nombre}")
+            println("   Fecha/Hora: ${cc.fechaHora}")
+            println("   Costo: ${formatearMoneda(cc.consulta.costoConsulta)}\n")
+        }
+    }
+
+    /**
+     * Genera estadísticas de consultas
+     */
+    fun generarEstadisticas() {
+        if (consultasRegistradas.isEmpty()) {
+            println("\n⚠️  No hay datos para generar estadísticas.")
+            return
+        }
+
+        var totalPendientes = 0
+        var totalProgramadas = 0
+        var totalRealizadas = 0
+        var costoTotal = 0.0
+
+        // Ciclo for para calcular estadísticas
+        for (cc in consultasRegistradas) {
+            when (cc.consulta.estado.lowercase()) {
+                "pendiente" -> totalPendientes++
+                "programada" -> totalProgramadas++
+                "realizada" -> totalRealizadas++
+            }
+            costoTotal += cc.consulta.costoConsulta
+        }
+
+        println("\n╔═══════════════════════════════════════════════════════════════╗")
+        println("║                 ESTADÍSTICAS DEL SISTEMA                      ║")
+        println("╚═══════════════════════════════════════════════════════════════╝")
+        println("  Total de consultas:    ${consultasRegistradas.size}")
+        println("  ─────────────────────────────────────────────────────────────")
+        println("  Pendientes:            $totalPendientes")
+        println("  Programadas:           $totalProgramadas")
+        println("  Realizadas:            $totalRealizadas")
+        println("  ─────────────────────────────────────────────────────────────")
+        println("  Ingreso Total:         ${formatearMoneda(costoTotal)}")
+        println("  Promedio por consulta: ${formatearMoneda(costoTotal / consultasRegistradas.size)}")
+        println("╚═══════════════════════════════════════════════════════════════╝\n")
+    }
+
+    /**
+     * Obtiene el total de consultas registradas
+     */
+    fun getTotalConsultas(): Int = consultasRegistradas.size
 }
 

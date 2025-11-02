@@ -36,13 +36,7 @@ class MascotaService {
     }
 
     fun mostrarDetallesMascota(mascota: Mascota) {
-        println("\n┌─────────────────────────────────────────┐")
-        println("│ INFORMACIÓN DE LA MASCOTA               │")
-        println("└─────────────────────────────────────────┘")
-        println("  Nombre:    ${mascota.nombre}")
-        println("  Especie:   ${mascota.especie}")
-        println("  Edad:      ${mascota.edad} año(s)")
-        println("  Peso:      ${mascota.peso} kg")
+        // Usar método POO de la clase Mascota
+        println(mascota.mostrarInformacion())
     }
 }
-
